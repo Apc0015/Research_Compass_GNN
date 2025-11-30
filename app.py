@@ -403,7 +403,7 @@ def load_dataset_for_features(dataset_name="OGB arXiv"):
             # No valid dataset files found
             st.error("AMiner processed dataset not found or invalid.")
             st.info("To fix this:")
-            st.info("1. Run the fix script: `python fix_aminer_data.py`")
+            st.info("1. Run the training notebook: `notebooks/GNN_AMiner.ipynb`")
             return None
 
         except Exception as e:
@@ -709,6 +709,7 @@ def create_knowledge_graph_visualization(graph_data, target_idx, categories, pre
     # Create figure
     network_type = "Citation Network" if dataset_name == "OGB arXiv" else "Collaboration Network"
     fig = go.Figure(data=[edge_trace, node_trace],
+                   # Layout configuration
                    layout=go.Layout(
                        title=dict(
                            text=f'Real {network_type} (K-NN Subgraph)',
@@ -785,77 +786,11 @@ def main():
         )
         
         st.markdown("---")
-        st.markdown("### Dataset Info")
-
-        dataset_info = DATASET_INFO[dataset_choice]
-
-        if dataset_choice == "OGB arXiv":
-            st.success(f"""
-            **OGB arXiv Dataset**
-            - 169,343 CS papers (1993-2020)
-            - 40 topic categories
-            - Dense citation network
-            - High-quality labels
-            - **Best for**: Paper classification
-            """)
-        else:
-            st.warning(f"""
-            **AMiner Author Network**
-            - 10,000 authors
-            - 8 research fields
-            - Co-authorship graph
-            - Class imbalanced
-            - **Best for**: Author profiling
-            - **GraphSAGE model recommended**
-            """)
-
-        st.markdown("---")
-        st.markdown("### Model Performance")
-
-        if dataset_choice == "OGB arXiv":
-            st.info("""
-            **Expected Accuracy:**
-            - GAT: ~50-57%
-            - GCN: ~50-57%
-            - GraphSAGE: ~50-57%
-
-            All models perform similarly on this high-quality dataset.
-            """)
-        else:  # AMiner
-            st.info("""
-            **Expected Accuracy:**
-            - GraphSAGE: **71%** ✅ (Recommended)
-            - GAT: 43%
-            - GCN: 28%
-
-            **GraphSAGE strongly recommended for AMiner**
-            """)
-        
-        st.markdown("---")
-        st.markdown("### Model Info")
-        st.info("""
-        **Models Available:**
-        - **GAT**: Uses attention mechanism to weight neighbor importance
-        - **GCN**: Classic graph convolution approach
-        - **GraphSAGE**: Samples and aggregates features from neighbors
-        """)
-        
-        st.markdown("---")
-        st.markdown("### How to Use")
-        st.markdown("""
-        1. Select a dataset
-        2. Upload a research paper (PDF) or paste text
-        3. Choose a GNN model
-        4. Click 'Predict Topic'
-        5. View predictions and confidence scores
-        """)
-
-        st.markdown("---")
         st.markdown("### Training Notebooks")
         st.markdown("""
         View complete training code:
-        - [OGB Training](https://github.com/Apc0015/Rech_Comp/blob/main/notebooks/GNN_OGB.ipynb)
-        - [AMiner Training](https://github.com/Apc0015/Rech_Comp/blob/main/notebooks/GNN_AMiner.ipynb)
+        - [OGB Training](https://github.com/Apc0015/Research_Compass_GNN/blob/main/notebooks/GNN_OGB.ipynb)
+        - [AMiner Training](https://github.com/Apc0015/Research_Compass_GNN/blob/main/notebooks/GNN_AMiner.ipynb)
 
         Retrain models by running all cells in these notebooks.
         """)
@@ -890,40 +825,27 @@ def main():
     categories = dataset_config['categories']
     
     # Main content
-    col1, col2 = st.columns([2, 1])
-    
-    with col2:
-        st.markdown("### Model Performance")
-        if results is not None:
-            for idx, row in results.iterrows():
-                st.metric(
-                    label=row['Model'],
-                    value=f"{row['Test Accuracy']:.2%}",
-                    delta=None
-                )
-        st.markdown("---")
-    
-    with col1:
-        st.markdown("### Upload Research Paper")
+    # Main content
+    st.markdown("### Upload Research Paper")
         
-        # File uploader (multiple files)
-        uploaded_files = st.file_uploader(
-            "Choose PDF file(s)",
-            type=['pdf'],
-            accept_multiple_files=True,
-            help="Upload one or more research papers in PDF format"
+    # File uploader (multiple files)
+    uploaded_files = st.file_uploader(
+        "Choose PDF file(s)",
+        type=['pdf'],
+        accept_multiple_files=True,
+        help="Upload one or more research papers in PDF format"
+    )
+    
+    # Text input alternative
+    with st.expander("Or paste paper abstract/text"):
+        placeholder_text = "Enter the abstract or full text of your research paper..."
+        if dataset_choice == "AMiner":
+            placeholder_text = "Enter author information or research topics..."
+        manual_text = st.text_area(
+            "Paste text here",
+            height=200,
+            placeholder=placeholder_text
         )
-        
-        # Text input alternative
-        with st.expander("Or paste paper abstract/text"):
-            placeholder_text = "Enter the abstract or full text of your research paper..."
-            if dataset_choice == "AMiner":
-                placeholder_text = "Enter author information or research topics..."
-            manual_text = st.text_area(
-                "Paste text here",
-                height=200,
-                placeholder=placeholder_text
-            )
     
     # Prediction button
     if st.button("Predict Topic", type="primary", use_container_width=True):
@@ -993,46 +915,22 @@ def main():
                 
                 # Main prediction
                 st.markdown(f"""
-                <div class="prediction-box">
-                    <h2>Predicted Topic</h2>
-                    <h1>{categories[predicted_class]}</h1>
-                    <h3>Confidence: {confidence:.1%}</h3>
-                    <p style="font-size:0.9em; opacity:0.9;">Dataset: {dataset_choice} | Model: {model_choice}</p>
+                <div style="
+                    background-color: #f8f9fa;
+                    padding: 20px;
+                    border-radius: 10px;
+                    border-left: 5px solid #4CAF50;
+                    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+                    margin-bottom: 20px;
+                ">
+                    <h3 style="margin:0; color: #666; font-size: 14px; text-transform: uppercase; letter-spacing: 1px;">Predicted Topic</h3>
+                    <h1 style="margin: 10px 0; color: #333; font-size: 32px;">{categories[predicted_class]}</h1>
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 15px;">
+                        <span style="font-weight: bold; color: #4CAF50; font-size: 18px;">{confidence:.1%} Confidence</span>
+                        <span style="color: #888; font-size: 12px;">{dataset_choice} • {model_choice}</span>
+                    </div>
                 </div>
                 """, unsafe_allow_html=True)
-
-                # Model-specific insights
-                if dataset_choice == "AMiner" and model_choice != "GraphSAGE":
-                    st.warning(f"""
-                    **Performance Notice**: You're using {model_choice} which has lower accuracy on AMiner.
-                    **Recommendation**: Switch to **GraphSAGE** for better results (71% vs {confidence:.1%} confidence).
-                    GraphSAGE achieves 71% accuracy compared to 43% (GAT) and 28% (GCN) on this dataset.
-                    """)
-
-                # Performance metrics
-                with st.expander("Model Performance Details"):
-                    if dataset_choice == "OGB arXiv":
-                        expected_acc = "50-57%"
-                    else:  # AMiner
-                        if model_choice == "GraphSAGE":
-                            expected_acc = "71%"
-                        elif "GAT" in model_choice:
-                            expected_acc = "43%"
-                        else:  # GCN
-                            expected_acc = "28%"
-
-                    st.markdown(f"""
-                    **Current Model: {model_choice}**
-                    - Dataset: {dataset_choice}
-                    - Expected Accuracy: {expected_acc}
-                    - Your Prediction Confidence: {confidence:.1%}
-
-                    **How Confidence Works:**
-                    - >80%: Very confident
-                    - 60-80%: Confident
-                    - 40-60%: Moderate
-                    - <40%: Low confidence
-                    """)
 
                 # Knowledge Graph Visualization
                 st.markdown("---")
