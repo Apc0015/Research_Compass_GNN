@@ -769,37 +769,53 @@ def main():
     
     # Sidebar
     with st.sidebar:
-        st.title("Configuration")
+        st.title("Research Compass")
         
-        # Dataset selection
-        dataset_choice = st.selectbox(
-            "Select Dataset",
-            ["OGB arXiv", "AMiner"],
-            help="Choose the dataset for prediction"
-        )
-        
-        # Set default based on dataset
-        if dataset_choice == "AMiner":
-            default_idx = 2  # GraphSAGE (strongly recommended)
-        else:
-            default_idx = 2  # GraphSAGE (slight edge, consistency)
-
-        model_choice = st.selectbox(
-            "Select GNN Model",
-            ["GAT (Graph Attention)", "GCN (Graph Convolution)", "GraphSAGE"],
-            index=default_idx,
-            help="Choose the Graph Neural Network architecture"
+        # Mode Selection
+        mode = st.radio(
+            "Mode",
+            ["Application", "Learn about GNNs"],
+            help="Switch between the prediction app and educational content"
         )
         
         st.markdown("---")
-        st.markdown("### Training Notebooks")
-        st.markdown("""
-        View complete training code:
-        - [OGB Training](https://github.com/Apc0015/Research_Compass_GNN/blob/main/notebooks/GNN_OGB.ipynb)
-        - [AMiner Training](https://github.com/Apc0015/Research_Compass_GNN/blob/main/notebooks/GNN_AMiner.ipynb)
+        
+        if mode == "Application":
+            st.subheader("Configuration")
+            
+            # Dataset selection
+            dataset_choice = st.selectbox(
+                "Select Dataset",
+                ["OGB arXiv", "AMiner"],
+                help="Choose the dataset for prediction"
+            )
+            
+            # Set default based on dataset
+            if dataset_choice == "AMiner":
+                default_idx = 2  # GraphSAGE (strongly recommended)
+            else:
+                default_idx = 2  # GraphSAGE (slight edge, consistency)
 
-        Retrain models by running all cells in these notebooks.
-        """)
+            model_choice = st.selectbox(
+                "Select GNN Model",
+                ["GAT (Graph Attention)", "GCN (Graph Convolution)", "GraphSAGE"],
+                index=default_idx,
+                help="Choose the Graph Neural Network architecture"
+            )
+            
+            st.markdown("---")
+            st.markdown("### Training Notebooks")
+            st.markdown("""
+            View complete training code:
+            - [OGB Training](https://github.com/Apc0015/Research_Compass_GNN/blob/main/notebooks/GNN_OGB.ipynb)
+            - [AMiner Training](https://github.com/Apc0015/Research_Compass_GNN/blob/main/notebooks/GNN_AMiner.ipynb)
+
+            Retrain models by running all cells in these notebooks.
+            """)
+        else:
+            # Defaults for Learn mode to avoid errors if used later
+            dataset_choice = "OGB arXiv"
+            model_choice = "GraphSAGE"
     
     # Load models
     with st.spinner(f"Loading {dataset_choice} models..."):
@@ -832,174 +848,251 @@ def main():
     
     # Main content
     # Main content
-    st.markdown("### Upload Research Paper")
+    # Main content
+    if mode == "Learn about GNNs":
+        st.header("🎓 Learn about Graph Neural Networks")
+        st.markdown("""
+        ### What is a GNN?
+        Graph Neural Networks (GNNs) are deep learning models designed to process data represented as graphs.
+        Unlike traditional neural networks that treat data points in isolation, GNNs leverage the **relationships** (edges) between data points (nodes).
         
-    # File uploader (multiple files)
-    uploaded_files = st.file_uploader(
-        "Choose PDF file(s)",
-        type=['pdf'],
-        accept_multiple_files=True,
-        help="Upload one or more research papers in PDF format"
-    )
+        ### How it works in this app:
+        1.  **Text Extraction**: We extract text from your uploaded PDF.
+        2.  **Feature Vector**: We convert the text into a numerical vector (using TF-IDF).
+        3.  **Graph Construction**: We find the most similar papers in our dataset to create a "subgraph".
+        4.  **Prediction**: The GNN analyzes this subgraph to predict the topic based on:
+            -   The content of your paper
+            -   The topics of the connected papers
+            
+        ### The Models
+        -   **GAT (Graph Attention Network)**: Pays different amounts of "attention" to different neighbors.
+        -   **GCN (Graph Convolutional Network)**: Aggregates information from neighbors equally.
+        -   **GraphSAGE**: Samples neighbors to handle large graphs efficiently.
+        """)
+        return
+
+    # Application Mode
+    tab_pred, tab_model, tab_data = st.tabs(["🔮 Prediction", "🧠 Model Architecture", "📊 Dataset Stats"])
     
-    # Text input alternative
-    with st.expander("Or paste paper abstract/text"):
-        placeholder_text = "Enter the abstract or full text of your research paper..."
-        if dataset_choice == "AMiner":
-            placeholder_text = "Enter author information or research topics..."
-        manual_text = st.text_area(
-            "Paste text here",
-            height=200,
-            placeholder=placeholder_text
+    with tab_pred:
+        st.markdown("### Upload Research Paper")
+            
+        # File uploader (multiple files)
+        uploaded_files = st.file_uploader(
+            "Choose PDF file(s)",
+            type=['pdf'],
+            accept_multiple_files=True,
+            help="Upload one or more research papers in PDF format"
         )
-    
-    # Prediction button
-    if st.button("Predict Topic", type="primary", use_container_width=True):
-        papers_to_process = []
         
-        # Get text from files or manual input
-        if uploaded_files and len(uploaded_files) > 0:
-            with st.spinner(f"Extracting text from {len(uploaded_files)} PDF(s)..."):
-                for uploaded_file in uploaded_files:
-                    paper_text = extract_text_from_pdf(uploaded_file)
-                    if paper_text:
-                        paper_text = preprocess_text(paper_text)
-                        papers_to_process.append((uploaded_file.name, paper_text))
-                st.success(f"Extracted text from {len(papers_to_process)} file(s)")
-        elif manual_text:
-            paper_text = preprocess_text(manual_text)
-            papers_to_process.append(("Manual Input", paper_text))
-        else:
-            st.warning("Please upload a PDF or paste text to continue.")
-            return
+        # Text input alternative
+        with st.expander("Or paste paper abstract/text"):
+            placeholder_text = "Enter the abstract or full text of your research paper..."
+            if dataset_choice == "AMiner":
+                placeholder_text = "Enter author information or research topics..."
+            manual_text = st.text_area(
+                "Paste text here",
+                height=200,
+                placeholder=placeholder_text
+            )
         
-        # Process each paper
-        for paper_idx, (paper_name, paper_text) in enumerate(papers_to_process):
-            if not paper_text:
-                st.error(f"No text extracted from '{paper_name}'")
-                continue
-
-            # Validate text length
-            word_count = len(paper_text.split())
-
-            # Show text statistics
-            st.markdown(f"#### Processing: {paper_name}")
-            st.info(f"Text length: {word_count} words")
-
-            # Check minimum word count
-            if word_count < 50:
-                st.error(f"Text too short: {word_count} words. Need at least 50 words for accurate prediction.")
-                st.info("Requirements:")
-                st.info("- Minimum: 50 words")
-                st.info("- Recommended: 200+ words (typical abstract length)")
-                st.info("- Ideal: 500+ words (abstract + introduction)")
-                continue
-            elif word_count < 200:
-                st.warning(f"Short text: {word_count} words. Predictions may be less accurate. Recommend 200+ words.")
-
-            # Make prediction
-            with st.spinner(f"Analyzing '{paper_name}' with {model_choice} on {dataset_choice}..."):
-                try:
-                    predicted_class, confidence, all_probs, top5_probs, top5_indices, graph_data, target_idx, node_mapping, knn_similarity_map = predict_topic(
-                        paper_text, selected_model, model_choice, data, dataset_config
-                    )
-                except ValueError as e:
-                    st.error(f"Validation error: {e}")
+        # Prediction button
+        if st.button("Predict Topic", type="primary", use_container_width=True):
+            papers_to_process = []
+            
+            # Get text from files or manual input
+            if uploaded_files and len(uploaded_files) > 0:
+                with st.spinner(f"Extracting text from {len(uploaded_files)} PDF(s)..."):
+                    for uploaded_file in uploaded_files:
+                        paper_text = extract_text_from_pdf(uploaded_file)
+                        if paper_text:
+                            paper_text = preprocess_text(paper_text)
+                            papers_to_process.append((uploaded_file.name, paper_text))
+                    st.success(f"Extracted text from {len(papers_to_process)} file(s)")
+            elif manual_text:
+                paper_text = preprocess_text(manual_text)
+                papers_to_process.append(("Manual Input", paper_text))
+            else:
+                st.warning("Please upload a PDF or paste text to continue.")
+                st.stop()
+            
+            # Process each paper
+            for paper_idx, (paper_name, paper_text) in enumerate(papers_to_process):
+                if not paper_text:
+                    st.error(f"No text extracted from '{paper_name}'")
                     continue
-                except Exception as e:
-                    st.error(f"Error during prediction: {e}")
-                    import traceback
-                    st.error(traceback.format_exc())
-                    continue
-                
-                # Display results
-                st.markdown("---")
-                if len(papers_to_process) > 1:
-                    st.markdown(f"## Prediction Results for '{paper_name}'")
-                else:
-                    st.markdown("## Prediction Results")
-                
-                # Main prediction
-                st.markdown(f"""
-                <div style="
-                    background-color: #f8f9fa;
-                    padding: 20px;
-                    border-radius: 10px;
-                    border-left: 5px solid #4CAF50;
-                    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-                    margin-bottom: 20px;
-                ">
-                    <h3 style="margin:0; color: #666; font-size: 14px; text-transform: uppercase; letter-spacing: 1px;">Predicted Topic</h3>
-                    <h1 style="margin: 10px 0; color: #333; font-size: 32px;">{categories[predicted_class]}</h1>
-                    <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 15px;">
-                        <span style="font-weight: bold; color: #4CAF50; font-size: 18px;">{confidence:.1%} Confidence</span>
-                        <span style="color: #888; font-size: 12px;">{dataset_choice} • {model_choice}</span>
-                    </div>
-                </div>
-                """, unsafe_allow_html=True)
 
-                # Knowledge Graph Visualization
-                st.markdown("---")
-                st.markdown("### Knowledge Graph Visualization")
-                
-                col_viz1, col_viz2 = st.columns(2)
-                
-                with col_viz1:
-                    # Citation network graph
-                    kg_fig = create_knowledge_graph_visualization(
-                        graph_data, target_idx, categories, predicted_class, top5_indices, top5_probs, confidence, node_mapping, knn_similarity_map, dataset_choice
-                    )
-                    st.plotly_chart(kg_fig, use_container_width=True)
-                
-                with col_viz2:
-                    # Topic distribution
-                    dist_fig = create_topic_distribution_graph(all_probs, categories, top5_indices)
-                    st.plotly_chart(dist_fig, use_container_width=True)
-                
-                # Top 5 predictions
-                st.markdown("---")
-                st.markdown("### Top 5 Predictions")
-                
-                for i, (prob, idx) in enumerate(zip(top5_probs, top5_indices)):
-                    idx_val = idx.item()
-                    prob_val = prob.item()
+                # Validate text length
+                word_count = len(paper_text.split())
+
+                # Show text statistics
+                st.markdown(f"#### Processing: {paper_name}")
+                st.info(f"Text length: {word_count} words")
+
+                # Check minimum word count
+                if word_count < 50:
+                    st.error(f"Text too short: {word_count} words. Need at least 50 words for accurate prediction.")
+                    st.info("Requirements:")
+                    st.info("- Minimum: 50 words")
+                    st.info("- Recommended: 200+ words (typical abstract length)")
+                    st.info("- Ideal: 500+ words (abstract + introduction)")
+                    continue
+                elif word_count < 200:
+                    st.warning(f"Short text: {word_count} words. Predictions may be less accurate. Recommend 200+ words.")
+
+                # Make prediction
+                with st.spinner(f"Analyzing '{paper_name}' with {model_choice} on {dataset_choice}..."):
+                    try:
+                        predicted_class, confidence, all_probs, top5_probs, top5_indices, graph_data, target_idx, node_mapping, knn_similarity_map = predict_topic(
+                            paper_text, selected_model, model_choice, data, dataset_config
+                        )
+                    except ValueError as e:
+                        st.error(f"Validation error: {e}")
+                        continue
+                    except Exception as e:
+                        st.error(f"Error during prediction: {e}")
+                        import traceback
+                        st.error(traceback.format_exc())
+                        continue
                     
-                    col_a, col_b = st.columns([3, 1])
-                    with col_a:
-                        st.markdown(f"**{i+1}. {categories[idx_val]}**")
-                        st.progress(prob_val)
-                    with col_b:
-                        st.metric("", f"{prob_val:.1%}")
-                
-                # Show paper preview
-                st.markdown("---")
-                st.markdown("### Paper Preview")
-                with st.expander("View extracted text (first 1000 characters)"):
-                    st.text(paper_text[:1000] + "..." if len(paper_text) > 1000 else paper_text)
-                
-                # Download predictions
-                st.markdown("---")
-                predictions_df = pd.DataFrame({
-                    'Rank': range(1, 6),
-                    'Topic': [categories[idx.item()] for idx in top5_indices],
-                    'Confidence': [f"{prob.item():.2%}" for prob in top5_probs]
-                })
-                
-                st.download_button(
-                    label="Download Predictions (CSV)",
-                    data=predictions_df.to_csv(index=False),
-                    file_name=f"predictions_{paper_name.replace('.pdf', '')}_{dataset_choice.lower().replace(' ', '_')}.csv",
-                    mime="text/csv",
-                    key=f"download_btn_{paper_idx}_{paper_name}"
-                )
+                    # Display results
+                    st.markdown("---")
+                    if len(papers_to_process) > 1:
+                        st.markdown(f"## Prediction Results for '{paper_name}'")
+                    else:
+                        st.markdown("## Prediction Results")
+                    
+                    # Main prediction
+                    st.markdown(f"""
+                    <div style="
+                        background-color: #f8f9fa;
+                        padding: 20px;
+                        border-radius: 10px;
+                        border-left: 5px solid #4CAF50;
+                        box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+                        margin-bottom: 20px;
+                    ">
+                        <h3 style="margin:0; color: #666; font-size: 14px; text-transform: uppercase; letter-spacing: 1px;">Predicted Topic</h3>
+                        <h1 style="margin: 10px 0; color: #333; font-size: 32px;">{categories[predicted_class]}</h1>
+                        <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 15px;">
+                            <span style="font-weight: bold; color: #4CAF50; font-size: 18px;">{confidence:.1%} Confidence</span>
+                            <span style="color: #888; font-size: 12px;">{dataset_choice} • {model_choice}</span>
+                        </div>
+                    </div>
+                    """, unsafe_allow_html=True)
 
-    # Footer
-    st.markdown("---")
-    st.markdown(f"""
-    <div style='text-align: center; color: #666; font-size: 0.9em;'>
-        <p>Dataset: {dataset_choice} | Model: {model_choice}</p>
-    </div>
-    """, unsafe_allow_html=True)
+                    # Explainability (Idea 7)
+                    with st.expander("🤔 Why this prediction?"):
+                        st.markdown(f"""
+                        **Confidence Analysis:**
+                        The model is **{confidence:.1%}** confident in this prediction.
+                        
+                        **Graph Context:**
+                        The prediction is based on the paper's text features and its connections in the citation graph.
+                        - **Direct Neighbors:** The paper is connected to {len(top5_indices)} similar papers in the graph.
+                        - **Dominant Category:** The majority of neighbors likely belong to **{categories[predicted_class]}**.
+                        """)
+
+                    # Knowledge Graph Visualization
+                    st.markdown("---")
+                    st.markdown("### Knowledge Graph Visualization")
+                    
+                    col_viz1, col_viz2 = st.columns(2)
+                    
+                    with col_viz1:
+                        # Citation network graph
+                        kg_fig = create_knowledge_graph_visualization(
+                            graph_data, target_idx, categories, predicted_class, top5_indices, top5_probs, confidence, node_mapping, knn_similarity_map, dataset_choice
+                        )
+                        st.plotly_chart(kg_fig, use_container_width=True)
+                    
+                    with col_viz2:
+                        # Topic distribution
+                        dist_fig = create_topic_distribution_graph(all_probs, categories, top5_indices)
+                        st.plotly_chart(dist_fig, use_container_width=True)
+                    
+                    # Top 5 predictions
+                    st.markdown("---")
+                    st.markdown("### Top 5 Predictions")
+                    
+                    for i, (prob, idx) in enumerate(zip(top5_probs, top5_indices)):
+                        idx_val = idx.item()
+                        prob_val = prob.item()
+                        
+                        col_a, col_b = st.columns([3, 1])
+                        with col_a:
+                            st.markdown(f"**{i+1}. {categories[idx_val]}**")
+                            st.progress(prob_val)
+                        with col_b:
+                            st.metric("", f"{prob_val:.1%}")
+                    
+                    # Show paper preview
+                    st.markdown("---")
+                    st.markdown("### Paper Preview")
+                    with st.expander("View extracted text (first 1000 characters)"):
+                        st.text(paper_text[:1000] + "..." if len(paper_text) > 1000 else paper_text)
+                    
+                    # Download predictions
+                    st.markdown("---")
+                    predictions_df = pd.DataFrame({
+                        'Rank': range(1, 6),
+                        'Topic': [categories[idx.item()] for idx in top5_indices],
+                        'Confidence': [f"{prob.item():.2%}" for prob in top5_probs]
+                    })
+                    
+                    st.download_button(
+                        label="Download Predictions (CSV)",
+                        data=predictions_df.to_csv(index=False),
+                        file_name=f"predictions_{paper_name.replace('.pdf', '')}_{dataset_choice.lower().replace(' ', '_')}.csv",
+                        mime="text/csv",
+                        key=f"download_btn_{paper_idx}_{paper_name}"
+                    )
+
+        # Footer
+        st.markdown("---")
+        st.markdown(f"""
+        <div style='text-align: center; color: #666; font-size: 0.9em;'>
+            <p>Dataset: {dataset_choice} | Model: {model_choice}</p>
+        </div>
+        """, unsafe_allow_html=True)
+
+    with tab_model:
+        st.markdown("### Model Architecture")
+        if model_choice == "GAT (Graph Attention)":
+            st.markdown("""
+            **Graph Attention Network (GAT)**
+            - **Mechanism**: Uses attention layers to weigh the importance of different neighbors.
+            - **Best for**: Citation networks where some references are more relevant than others.
+            - **Layers**: 3 (OGB) or 2 (AMiner)
+            - **Heads**: 4 attention heads per layer
+            """)
+        elif model_choice == "GCN (Graph Convolution)":
+            st.markdown("""
+            **Graph Convolutional Network (GCN)**
+            - **Mechanism**: Aggregates neighbor features using a fixed normalization.
+            - **Best for**: Homophilous graphs (neighbors are similar).
+            - **Layers**: 3 (OGB) or 2 (AMiner)
+            """)
+        else:
+            st.markdown("""
+            **GraphSAGE**
+            - **Mechanism**: Samples and aggregates neighbors (Inductive learning).
+            - **Best for**: Large graphs and unseen nodes (like new papers).
+            - **Layers**: 3 (OGB) or 2 (AMiner)
+            """)
+
+    with tab_data:
+        st.markdown(f"### {dataset_choice} Statistics")
+        st.markdown(f"""
+        - **Description**: {dataset_config['description']}
+        - **Task**: {dataset_config['task']}
+        - **Classes**: {dataset_config['num_classes']}
+        - **Feature Dimension**: {dataset_config['feature_dim']}
+        """)
+        if dataset_choice == "OGB arXiv":
+            st.info("The OGB arXiv dataset represents a citation network of Computer Science papers.")
+        else:
+            st.info("The AMiner dataset represents a co-authorship network of researchers.")
 
 if __name__ == "__main__":
     main()
