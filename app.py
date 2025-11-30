@@ -800,6 +800,8 @@ def main():
         - [OGB Training](https://github.com/Apc0015/Research_Compass_GNN/blob/main/notebooks/GNN_OGB.ipynb)
         - [AMiner Training](https://github.com/Apc0015/Research_Compass_GNN/blob/main/notebooks/GNN_AMiner.ipynb)
 
+        [**View Project Repository**](https://github.com/Apc0015/Research_Compass_GNN)
+
         Retrain models by running all cells in these notebooks.
         """)
     
