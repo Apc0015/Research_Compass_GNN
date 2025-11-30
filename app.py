@@ -351,9 +351,15 @@ def load_dataset_for_features(dataset_name="OGB arXiv"):
                     st.error("Real citation network visualization requires the actual OGB arXiv dataset.")
                     return None
             else:
-                st.error("OGB arXiv dataset not found. Real citation network requires downloading the dataset first.")
-                st.info("Run the training notebook (notebooks/GNN_OGB.ipynb) to download and process the dataset.")
-                return None
+                st.info("Downloading OGB arXiv dataset... (This may take a few minutes)")
+                try:
+                    dataset = PygNodePropPredDataset(name='ogbn-arxiv', root='data/')
+                    data = dataset[0]
+                    st.success("Successfully downloaded and loaded OGB arXiv dataset!")
+                    return data
+                except Exception as e:
+                    st.error(f"Failed to download dataset: {e}")
+                    return None
         except Exception as e:
             st.error(f"Error loading OGB arXiv dataset: {e}")
             import traceback
