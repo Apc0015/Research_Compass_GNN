@@ -377,66 +377,39 @@ def load_dataset_for_features(dataset_name="OGB arXiv"):
 
             aminer_processed_path = os.path.join('data', 'AMiner', 'processed')
 
-            # Try loading from standard processed file (data.pt)
+            # Try loading from our custom homogeneous file (data_homogeneous.pt)
+            homogeneous_file = os.path.join(aminer_processed_path, 'data_homogeneous.pt')
+            if os.path.exists(homogeneous_file):
+                try:
+                    data = torch.load(homogeneous_file, map_location='cpu', weights_only=False)
+                    st.success(f"Loaded AMiner dataset: {data.num_nodes} nodes, {data.edge_index.shape[1]} edges")
+                    return data
+                except Exception as e:
+                    st.warning(f"Could not load from {homogeneous_file}: {e}")
+
+            # Fallback: Try loading from standard processed file (data.pt)
             standard_file = os.path.join(aminer_processed_path, 'data.pt')
             if os.path.exists(standard_file):
                 try:
                     data = torch.load(standard_file, map_location='cpu', weights_only=False)
 
                     # Validate dataset has required attributes
-                    if not hasattr(data, 'x') or not hasattr(data, 'edge_index'):
-                        st.error("AMiner dataset is missing required attributes (x or edge_index)")
-                        st.info("Run notebooks/GNN_AMiner.ipynb to regenerate the dataset")
-                        return None
-
-                    if not hasattr(data, 'num_nodes') or data.num_nodes == 0:
-                        st.error("AMiner dataset has no nodes")
-                        st.info("Run notebooks/GNN_AMiner.ipynb to regenerate the dataset")
-                        return None
-
-                    st.success(f"Loaded AMiner dataset: {data.num_nodes} nodes, {data.edge_index.shape[1]} edges")
-                    return data
-
+                    if hasattr(data, 'x') and hasattr(data, 'edge_index'):
+                         st.success(f"Loaded AMiner dataset: {data.num_nodes} nodes, {data.edge_index.shape[1]} edges")
+                         return data
                 except Exception as e:
-                    st.warning(f"Could not load from {standard_file}: {e}")
+                    pass # Continue to next method
 
-            # Try loading from pre_transform.pt (alternative location)
-            alt_file = os.path.join(aminer_processed_path, 'pre_transform.pt')
-            if os.path.exists(alt_file):
-                try:
-                    data = torch.load(alt_file, map_location='cpu', weights_only=False)
-
-                    # Validate dataset
-                    if not hasattr(data, 'x') or not hasattr(data, 'edge_index'):
-                        st.error("AMiner dataset is missing required attributes")
-                        return None
-
-                    st.success(f"Loaded AMiner dataset: {data.num_nodes} nodes, {data.edge_index.shape[1]} edges")
-                    return data
-
-                except Exception as e:
-                    st.warning(f"Could not load from {alt_file}: {e}")
-
-            # Check if raw data exists but not processed
-            aminer_raw_path = os.path.join('data', 'AMiner', 'raw')
-            if os.path.exists(aminer_raw_path):
-                st.error("AMiner raw data found but not processed")
-                st.info("Run all cells in notebooks/GNN_AMiner.ipynb to process the dataset")
-                return None
-
-            # No dataset files found at all
-            st.error("AMiner dataset not found in data/AMiner/")
+            # No valid dataset files found
+            st.error("AMiner processed dataset not found or invalid.")
             st.info("To fix this:")
-            st.info("1. Open notebooks/GNN_AMiner.ipynb")
-            st.info("2. Run all cells to download and process the AMiner dataset")
-            st.info("3. The dataset will be saved to data/AMiner/processed/")
+            st.info("1. Run the fix script: `python fix_aminer_data.py`")
             return None
 
         except Exception as e:
             st.error(f"Error loading AMiner dataset: {e}")
             import traceback
             st.error(traceback.format_exc())
-            st.info("Run notebooks/GNN_AMiner.ipynb to regenerate the dataset")
             return None
     
     return None
