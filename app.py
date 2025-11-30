@@ -771,51 +771,37 @@ def main():
     with st.sidebar:
         st.title("Research Compass")
         
-        # Mode Selection
-        mode = st.radio(
-            "Mode",
-            ["Application", "Learn about GNNs"],
-            help="Switch between the prediction app and educational content"
+        st.subheader("Configuration")
+        
+        # Dataset selection
+        dataset_choice = st.selectbox(
+            "Select Dataset",
+            ["OGB arXiv", "AMiner"],
+            help="Choose the dataset for prediction"
+        )
+        
+        # Set default based on dataset
+        if dataset_choice == "AMiner":
+            default_idx = 2  # GraphSAGE (strongly recommended)
+        else:
+            default_idx = 2  # GraphSAGE (slight edge, consistency)
+
+        model_choice = st.selectbox(
+            "Select GNN Model",
+            ["GAT (Graph Attention)", "GCN (Graph Convolution)", "GraphSAGE"],
+            index=default_idx,
+            help="Choose the Graph Neural Network architecture"
         )
         
         st.markdown("---")
-        
-        if mode == "Application":
-            st.subheader("Configuration")
-            
-            # Dataset selection
-            dataset_choice = st.selectbox(
-                "Select Dataset",
-                ["OGB arXiv", "AMiner"],
-                help="Choose the dataset for prediction"
-            )
-            
-            # Set default based on dataset
-            if dataset_choice == "AMiner":
-                default_idx = 2  # GraphSAGE (strongly recommended)
-            else:
-                default_idx = 2  # GraphSAGE (slight edge, consistency)
+        st.markdown("### Training Notebooks")
+        st.markdown("""
+        View complete training code:
+        - [OGB Training](https://github.com/Apc0015/Research_Compass_GNN/blob/main/notebooks/GNN_OGB.ipynb)
+        - [AMiner Training](https://github.com/Apc0015/Research_Compass_GNN/blob/main/notebooks/GNN_AMiner.ipynb)
 
-            model_choice = st.selectbox(
-                "Select GNN Model",
-                ["GAT (Graph Attention)", "GCN (Graph Convolution)", "GraphSAGE"],
-                index=default_idx,
-                help="Choose the Graph Neural Network architecture"
-            )
-            
-            st.markdown("---")
-            st.markdown("### Training Notebooks")
-            st.markdown("""
-            View complete training code:
-            - [OGB Training](https://github.com/Apc0015/Research_Compass_GNN/blob/main/notebooks/GNN_OGB.ipynb)
-            - [AMiner Training](https://github.com/Apc0015/Research_Compass_GNN/blob/main/notebooks/GNN_AMiner.ipynb)
-
-            Retrain models by running all cells in these notebooks.
-            """)
-        else:
-            # Defaults for Learn mode to avoid errors if used later
-            dataset_choice = "OGB arXiv"
-            model_choice = "GraphSAGE"
+        Retrain models by running all cells in these notebooks.
+        """)
     
     # Load models
     with st.spinner(f"Loading {dataset_choice} models..."):
@@ -848,30 +834,6 @@ def main():
     
     # Main content
     # Main content
-    # Main content
-    if mode == "Learn about GNNs":
-        st.header("🎓 Learn about Graph Neural Networks")
-        st.markdown("""
-        ### What is a GNN?
-        Graph Neural Networks (GNNs) are deep learning models designed to process data represented as graphs.
-        Unlike traditional neural networks that treat data points in isolation, GNNs leverage the **relationships** (edges) between data points (nodes).
-        
-        ### How it works in this app:
-        1.  **Text Extraction**: We extract text from your uploaded PDF.
-        2.  **Feature Vector**: We convert the text into a numerical vector (using TF-IDF).
-        3.  **Graph Construction**: We find the most similar papers in our dataset to create a "subgraph".
-        4.  **Prediction**: The GNN analyzes this subgraph to predict the topic based on:
-            -   The content of your paper
-            -   The topics of the connected papers
-            
-        ### The Models
-        -   **GAT (Graph Attention Network)**: Pays different amounts of "attention" to different neighbors.
-        -   **GCN (Graph Convolutional Network)**: Aggregates information from neighbors equally.
-        -   **GraphSAGE**: Samples neighbors to handle large graphs efficiently.
-        """)
-        return
-
-    # Application Mode
     tab_pred, tab_model, tab_data = st.tabs(["🔮 Prediction", "🧠 Model Architecture", "📊 Dataset Stats"])
     
     with tab_pred:
