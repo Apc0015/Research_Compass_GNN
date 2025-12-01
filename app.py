@@ -606,11 +606,11 @@ def predict_topic(text, model, model_name, data, dataset_config):
 
     return predicted_class, confidence, probabilities, top5_probs, top5_indices, graph_data, target_idx, node_mapping, knn_similarity_map
 
-def create_knowledge_graph_visualization(graph_data, target_idx, categories, predicted_class, top5_indices, top5_probs, confidence, node_mapping, knn_similarity_map, dataset_name):
+def create_knowledge_graph_visualization(graph_data, target_idx, categories, predicted_class, top5_indices, top5_probs, confidence, node_mapping, knn_similarity_map, dataset_name, full_data=None):
     """Create interactive knowledge graph visualization using Plotly with real citation network"""
 
-    # Limit to small subgraph for visualization
-    num_nodes = min(50, graph_data.x.shape[0])
+    # Limit subgraph size for visualization
+    num_nodes = min(30, graph_data.x.shape[0])
 
     # Create NetworkX graph
     G = nx.Graph()
@@ -622,103 +622,177 @@ def create_knowledge_graph_visualization(graph_data, target_idx, categories, pre
 
     # Add edges (limit to nodes in our subset) - REAL edges from dataset
     edge_index = graph_data.edge_index.numpy()
+    
+    # Separate edges into "KNN" (direct from target) and "Structure" (others)
+    knn_edges = []
+    structure_edges = []
+    
     for i in range(edge_index.shape[1]):
         src, dst = edge_index[0, i], edge_index[1, i]
         if src < num_nodes and dst < num_nodes:
             G.add_edge(int(src), int(dst))
+            
+            # Check if this is a K-NN edge (connected to target and in similarity map)
+            is_knn = False
+            if src == target_idx and dst in knn_similarity_map:
+                knn_edges.append((src, dst, knn_similarity_map[dst]))
+                is_knn = True
+            elif dst == target_idx and src in knn_similarity_map:
+                knn_edges.append((dst, src, knn_similarity_map[src]))
+                is_knn = True
+            
+            if not is_knn:
+                structure_edges.append((src, dst))
 
     # Use spring layout for positioning
     pos = nx.spring_layout(G, k=2, iterations=50, seed=42)
 
-    # Create edge trace
+    # Create traces list
+    traces = []
+
+    # 1. Structure Edges (Background)
     edge_x = []
     edge_y = []
-
-    for edge in G.edges():
-        x0, y0 = pos[edge[0]]
-        x1, y1 = pos[edge[1]]
+    for src, dst in structure_edges:
+        x0, y0 = pos[src]
+        x1, y1 = pos[dst]
         edge_x.extend([x0, x1, None])
         edge_y.extend([y0, y1, None])
 
-    edge_trace = go.Scatter(
+    traces.append(go.Scatter(
         x=edge_x, y=edge_y,
-        line=dict(width=1, color='#888'),
+        line=dict(width=1, color='#e0e0e0'), # Faint gray
         hoverinfo='none',
         mode='lines',
         showlegend=False
-    )
+    ))
 
-    # Create node traces with REAL paper IDs
+    # 2. K-NN Edges (Highlighted with variable thickness/opacity)
+    for src, dst, score in knn_edges:
+        x0, y0 = pos[src]
+        x1, y1 = pos[dst]
+        
+        # Width based on score (0.0 to 1.0) -> 1 to 5
+        width = 1 + score * 4
+        opacity = 0.5 + (score * 0.5)
+        
+        traces.append(go.Scatter(
+            x=[x0, x1, None], y=[y0, y1, None],
+            line=dict(width=width, color=f'rgba(100, 100, 100, {opacity})'),
+            hoverinfo='text',
+            hovertext=f"Similarity: {score:.3f}",
+            mode='lines',
+            showlegend=False
+        ))
+
+    # 3. Nodes
     node_x = []
     node_y = []
     node_colors = []
     node_text = []
     node_sizes = []
+    node_line_colors = []
+    node_labels = [] # For on-graph text
+    
+    # Node color scheme: Target (Red), Same Topic (Blue), Others (Gray)
+    COLOR_TARGET = '#d62728'
+    COLOR_SAME = '#1f77b4'
+    COLOR_OTHER = '#d9d9d9'
 
     for node in G.nodes():
         x, y = pos[node]
         node_x.append(x)
         node_y.append(y)
+        
+        # Default node style
+        color = COLOR_OTHER
+        size = 12
+        text = f"Node {node}"
+        line_color = '#333'
+        label = ""
 
         if node == target_idx:
-            # Uploaded paper
-            node_colors.append('red')
-            node_sizes.append(30)
+            # Uploaded paper (Target)
+            color = COLOR_TARGET
+            size = 35
+            line_color = 'black'
             category_name = categories[predicted_class]
-            node_text.append(f"Your Paper<br>Predicted: {category_name}<br>Confidence: {confidence:.1%}")
+            text = f"<b>Your Paper</b><br>Predicted: {category_name}<br>Confidence: {confidence:.1%}"
+            label = "<b>YOUR PAPER</b>"
+        
         elif node in node_mapping:
             original_idx = node_mapping[node]
             if original_idx != -1:
-                # Real paper from dataset
-                if node in knn_similarity_map:
-                    # K-nearest neighbor with actual similarity score
-                    node_colors.append('orange')
-                    node_sizes.append(20)
-                    sim_score = knn_similarity_map[node]
-                    if dataset_name == "OGB arXiv":
-                        node_text.append(f"arXiv Paper #{original_idx}<br>Similarity: {sim_score:.3f}<br>Citation Connection")
-                    else:
-                        node_text.append(f"Author #{original_idx}<br>Similarity: {sim_score:.3f}<br>Collaboration Connection")
+                # Existing paper from dataset
+                
+                # 1. Calculate node degree for sizing
+                sub_degree = G.degree[node]
+                size = 10 + (sub_degree * 3)
+                
+                # 2. Determine node color based on topic
+                topic_name = "Unknown"
+                is_same_topic = False
+                
+                if full_data is not None and hasattr(full_data, 'y') and full_data.y is not None:
+                    try:
+                        # Handle different label shapes
+                        y_val = full_data.y[original_idx]
+                        if y_val.numel() == 1:
+                            label_id = y_val.item()
+                        else:
+                            label_id = y_val.argmax().item()
+                        
+                        topic_name = categories.get(label_id, f"Class {label_id}")
+                        
+                        # Check if same as predicted class
+                        if label_id == predicted_class:
+                            color = COLOR_SAME
+                            is_same_topic = True
+                        else:
+                            color = COLOR_OTHER
+                            
+                    except Exception:
+                        color = COLOR_OTHER
                 else:
-                    # Citation/collaboration neighbor
-                    node_colors.append('lightblue')
-                    node_sizes.append(12)
-                    if dataset_name == "OGB arXiv":
-                        node_text.append(f"arXiv Paper #{original_idx}<br>Connected via citations")
-                    else:
-                        node_text.append(f"Author #{original_idx}<br>Connected via co-authorship")
-            else:
-                # Uploaded paper (shouldn't happen but handle gracefully)
-                node_colors.append('red')
-                node_sizes.append(30)
-                node_text.append(f"Your Paper")
-        else:
-            # Fallback
-            node_colors.append('lightgray')
-            node_sizes.append(8)
-            node_text.append(f"Node {node}")
+                    color = COLOR_OTHER
 
-    node_trace = go.Scatter(
+                # Text
+                sim_str = ""
+                if node in knn_similarity_map:
+                    sim_str = f"<br>Similarity: {knn_similarity_map[node]:.3f}"
+                    # Label K-NN neighbors
+                    label = f"ID: {original_idx}"
+                
+                text = f"<b>Paper #{original_idx}</b><br>Topic: {topic_name}{sim_str}<br>Connections: {sub_degree}"
+
+        node_colors.append(color)
+        node_sizes.append(size)
+        node_text.append(text)
+        node_line_colors.append(line_color)
+        node_labels.append(label)
+
+    traces.append(go.Scatter(
         x=node_x, y=node_y,
-        mode='markers',
+        mode='markers+text',
+        text=node_labels,
+        textposition="top center",
         hoverinfo='text',
         hovertext=node_text,
         marker=dict(
             showscale=False,
             color=node_colors,
             size=node_sizes,
-            line=dict(width=1, color='#333')
+            line=dict(width=2, color=node_line_colors)
         ),
         showlegend=False
-    )
+    ))
 
     # Create figure
     network_type = "Citation Network" if dataset_name == "OGB arXiv" else "Collaboration Network"
-    fig = go.Figure(data=[edge_trace, node_trace],
-                   # Layout configuration
+    fig = go.Figure(data=traces,
                    layout=go.Layout(
                        title=dict(
-                           text=f'Real {network_type} (K-NN Subgraph)',
+                           text=f'Real {network_type} (Smart View)',
                            x=0.5,
                            xanchor='center'
                        ),
@@ -728,7 +802,7 @@ def create_knowledge_graph_visualization(graph_data, target_idx, categories, pre
                        xaxis=dict(showgrid=False, zeroline=False, showticklabels=False),
                        yaxis=dict(showgrid=False, zeroline=False, showticklabels=False),
                        plot_bgcolor='white',
-                       height=500
+                       height=600
                    ))
 
     return fig
@@ -961,14 +1035,25 @@ def main():
                     st.markdown("---")
                     st.markdown("### Knowledge Graph Visualization")
                     
+                    with st.expander("📖 How to read this graph", expanded=True):
+                        st.markdown("""
+                        - **🔴 Red Node**: Your uploaded paper (The "Target").
+                        - **🔵 Blue Nodes**: Papers in the **same topic** as yours.
+                        - **⚪ Gray Nodes**: Papers in **different topics** (showing cross-disciplinary connections).
+                        - **🏷️ Labels**: Direct neighbors show their **Paper ID** for quick reference.
+                        - **➖ Edge Thickness**: Thicker lines indicate **higher similarity** to your paper.
+                        """)
+                    
                     col_viz1, col_viz2 = st.columns(2)
                     
                     with col_viz1:
                         # Citation network graph
                         kg_fig = create_knowledge_graph_visualization(
-                            graph_data, target_idx, categories, predicted_class, top5_indices, top5_probs, confidence, node_mapping, knn_similarity_map, dataset_choice
+                            graph_data, target_idx, categories, predicted_class, top5_indices, top5_probs, confidence, node_mapping, knn_similarity_map, dataset_choice, full_data=data
                         )
                         st.plotly_chart(kg_fig, use_container_width=True)
+                        
+                        # Node inspection feature removed
                     
                     with col_viz2:
                         # Topic distribution
@@ -990,11 +1075,7 @@ def main():
                         with col_b:
                             st.metric("", f"{prob_val:.1%}")
                     
-                    # Show paper preview
-                    st.markdown("---")
-                    st.markdown("### Paper Preview")
-                    with st.expander("View extracted text (first 1000 characters)"):
-                        st.text(paper_text[:1000] + "..." if len(paper_text) > 1000 else paper_text)
+                    
                     
                     # Download predictions
                     st.markdown("---")
