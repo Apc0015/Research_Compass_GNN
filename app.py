@@ -25,7 +25,6 @@ warnings.filterwarnings('ignore')
 # Set page config
 st.set_page_config(
     page_title="Research Compass - GNN Paper Classifier",
-    page_icon="📄",
     layout="wide",
     initial_sidebar_state="expanded"
 )
@@ -34,37 +33,29 @@ st.set_page_config(
 st.markdown("""
 <style>
     .main-header {
-        font-size: 3rem;
+        font-size: 2.5rem;
         font-weight: bold;
         color: #1f77b4;
         text-align: center;
         margin-bottom: 1rem;
     }
     .sub-header {
-        font-size: 1.5rem;
+        font-size: 1.3rem;
         color: #666;
         text-align: center;
         margin-bottom: 2rem;
     }
     .metric-card {
-        background-color: #f0f2f6;
+        background-color: #f8f9fa;
         padding: 1rem;
-        border-radius: 0.5rem;
-        border-left: 4px solid #1f77b4;
+        border-left: 3px solid #1f77b4;
     }
     .prediction-box {
-        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-        color: white;
-        padding: 2rem;
-        border-radius: 1rem;
+        background-color: #f8f9fa;
+        padding: 1.5rem;
+        border: 2px solid #4CAF50;
         text-align: center;
         margin: 1rem 0;
-    }
-    .confidence-bar {
-        background-color: #e0e0e0;
-        border-radius: 10px;
-        height: 30px;
-        margin: 0.5rem 0;
     }
 </style>
 """, unsafe_allow_html=True)
@@ -609,29 +600,45 @@ def predict_topic(text, model, model_name, data, dataset_config):
 def create_knowledge_graph_visualization(graph_data, target_idx, categories, predicted_class, top5_indices, top5_probs, confidence, node_mapping, knn_similarity_map, dataset_name, full_data=None):
     """Create interactive knowledge graph visualization using Plotly with real citation network"""
 
+    # Debug: Check if we have label data
+    has_labels = full_data is not None and hasattr(full_data, 'y') and full_data.y is not None
+    if not has_labels:
+        print(f"WARNING: No label data available for coloring nodes. full_data={'None' if full_data is None else 'exists'}")
+
     # Limit subgraph size for visualization
-    num_nodes = min(30, graph_data.x.shape[0])
+    # IMPORTANT: Always include the target node
+    total_nodes = graph_data.x.shape[0]
+
+    # Display up to 30 nodes, but ALWAYS include the target
+    if total_nodes <= 30:
+        # Show all nodes
+        nodes_to_display = list(range(total_nodes))
+    else:
+        # Show first 29 nodes + target node
+        nodes_to_display = list(range(29)) + [target_idx]
 
     # Create NetworkX graph
     G = nx.Graph()
 
-    # Add nodes
-    for i in range(num_nodes):
+    # Add nodes (including target)
+    for i in nodes_to_display:
         node_type = "target" if i == target_idx else "context"
         G.add_node(i, node_type=node_type)
 
     # Add edges (limit to nodes in our subset) - REAL edges from dataset
     edge_index = graph_data.edge_index.numpy()
-    
+    nodes_set = set(nodes_to_display)
+
     # Separate edges into "KNN" (direct from target) and "Structure" (others)
     knn_edges = []
     structure_edges = []
-    
+
     for i in range(edge_index.shape[1]):
         src, dst = edge_index[0, i], edge_index[1, i]
-        if src < num_nodes and dst < num_nodes:
+        # Only include edges where both nodes are in our display set
+        if src in nodes_set and dst in nodes_set:
             G.add_edge(int(src), int(dst))
-            
+
             # Check if this is a K-NN edge (connected to target and in similarity map)
             is_knn = False
             if src == target_idx and dst in knn_similarity_map:
@@ -640,7 +647,7 @@ def create_knowledge_graph_visualization(graph_data, target_idx, categories, pre
             elif dst == target_idx and src in knn_similarity_map:
                 knn_edges.append((dst, src, knn_similarity_map[src]))
                 is_knn = True
-            
+
             if not is_knn:
                 structure_edges.append((src, dst))
 
@@ -671,16 +678,19 @@ def create_knowledge_graph_visualization(graph_data, target_idx, categories, pre
     for src, dst, score in knn_edges:
         x0, y0 = pos[src]
         x1, y1 = pos[dst]
-        
+
+        # Convert torch.Tensor to float if needed
+        score_val = score.item() if hasattr(score, 'item') else float(score)
+
         # Width based on score (0.0 to 1.0) -> 1 to 5
-        width = 1 + score * 4
-        opacity = 0.5 + (score * 0.5)
-        
+        width = 1 + score_val * 4
+        opacity = 0.5 + (score_val * 0.5)
+
         traces.append(go.Scatter(
             x=[x0, x1, None], y=[y0, y1, None],
             line=dict(width=width, color=f'rgba(100, 100, 100, {opacity})'),
             hoverinfo='text',
-            hovertext=f"Similarity: {score:.3f}",
+            hovertext=f"Similarity: {score_val:.3f}",
             mode='lines',
             showlegend=False
         ))
@@ -741,28 +751,52 @@ def create_knowledge_graph_visualization(graph_data, target_idx, categories, pre
                             label_id = y_val.item()
                         else:
                             label_id = y_val.argmax().item()
-                        
+
                         topic_name = categories.get(label_id, f"Class {label_id}")
-                        
+
                         # Check if same as predicted class
                         if label_id == predicted_class:
                             color = COLOR_SAME
                             is_same_topic = True
                         else:
                             color = COLOR_OTHER
-                            
-                    except Exception:
-                        color = COLOR_OTHER
+
+                    except Exception as e:
+                        # Fallback: Color based on similarity if available
+                        if node in knn_similarity_map:
+                            # Color by similarity: high similarity = blue, low = gray
+                            similarity = knn_similarity_map[node].item() if hasattr(knn_similarity_map[node], 'item') else knn_similarity_map[node]
+                            if similarity > 0.7:
+                                color = COLOR_SAME  # High similarity - blue
+                            elif similarity > 0.5:
+                                color = '#87CEEB'  # Medium similarity - light blue
+                            else:
+                                color = COLOR_OTHER  # Low similarity - gray
+                        else:
+                            color = COLOR_OTHER
+                        print(f"Warning: Could not get label for node {original_idx}: {e}")
                 else:
-                    color = COLOR_OTHER
+                    # No label data available - color by similarity instead
+                    if node in knn_similarity_map:
+                        similarity = knn_similarity_map[node].item() if hasattr(knn_similarity_map[node], 'item') else knn_similarity_map[node]
+                        if similarity > 0.7:
+                            color = COLOR_SAME  # High similarity - blue
+                        elif similarity > 0.5:
+                            color = '#87CEEB'  # Medium similarity - light blue
+                        else:
+                            color = COLOR_OTHER  # Low similarity - gray
+                    else:
+                        color = COLOR_OTHER
 
                 # Text
                 sim_str = ""
                 if node in knn_similarity_map:
-                    sim_str = f"<br>Similarity: {knn_similarity_map[node]:.3f}"
+                    sim_val = knn_similarity_map[node]
+                    sim_float = sim_val.item() if hasattr(sim_val, 'item') else float(sim_val)
+                    sim_str = f"<br>Similarity: {sim_float:.3f}"
                     # Label K-NN neighbors
                     label = f"ID: {original_idx}"
-                
+
                 text = f"<b>Paper #{original_idx}</b><br>Topic: {topic_name}{sim_str}<br>Connections: {sub_degree}"
 
         node_colors.append(color)
@@ -909,8 +943,7 @@ def main():
     categories = dataset_config['categories']
     
     # Main content
-    # Main content
-    tab_pred, tab_model, tab_data = st.tabs(["🔮 Prediction", "🧠 Model Architecture", "📊 Dataset Stats"])
+    tab_pred, tab_model, tab_data = st.tabs(["Prediction", "Model Architecture", "Dataset Stats"])
     
     with tab_pred:
         st.markdown("### Upload Research Paper")
@@ -1005,22 +1038,20 @@ def main():
                     <div style="
                         background-color: #f8f9fa;
                         padding: 20px;
-                        border-radius: 10px;
-                        border-left: 5px solid #4CAF50;
-                        box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+                        border: 2px solid #4CAF50;
                         margin-bottom: 20px;
                     ">
-                        <h3 style="margin:0; color: #666; font-size: 14px; text-transform: uppercase; letter-spacing: 1px;">Predicted Topic</h3>
-                        <h1 style="margin: 10px 0; color: #333; font-size: 32px;">{categories[predicted_class]}</h1>
-                        <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 15px;">
-                            <span style="font-weight: bold; color: #4CAF50; font-size: 18px;">{confidence:.1%} Confidence</span>
-                            <span style="color: #888; font-size: 12px;">{dataset_choice} • {model_choice}</span>
+                        <h3 style="margin:0; color: #666; font-size: 14px; text-transform: uppercase;">Predicted Topic</h3>
+                        <h1 style="margin: 10px 0; color: #333; font-size: 28px;">{categories[predicted_class]}</h1>
+                        <div style="margin-top: 15px;">
+                            <span style="font-weight: bold; color: #4CAF50; font-size: 16px;">{confidence:.1%} Confidence</span>
+                            <span style="color: #888; font-size: 12px; float: right;">{dataset_choice} - {model_choice}</span>
                         </div>
                     </div>
                     """, unsafe_allow_html=True)
 
-                    # Explainability (Idea 7)
-                    with st.expander("🤔 Why this prediction?"):
+                    # Explainability
+                    with st.expander("Why this prediction?"):
                         st.markdown(f"""
                         **Confidence Analysis:**
                         The model is **{confidence:.1%}** confident in this prediction.
@@ -1035,13 +1066,13 @@ def main():
                     st.markdown("---")
                     st.markdown("### Knowledge Graph Visualization")
                     
-                    with st.expander("📖 How to read this graph", expanded=True):
+                    with st.expander("How to read this graph", expanded=True):
                         st.markdown("""
-                        - **🔴 Red Node**: Your uploaded paper (The "Target").
-                        - **🔵 Blue Nodes**: Papers in the **same topic** as yours.
-                        - **⚪ Gray Nodes**: Papers in **different topics** (showing cross-disciplinary connections).
-                        - **🏷️ Labels**: Direct neighbors show their **Paper ID** for quick reference.
-                        - **➖ Edge Thickness**: Thicker lines indicate **higher similarity** to your paper.
+                        - **Red Node**: Your uploaded paper (The "Target").
+                        - **Blue Nodes**: Papers in the **same topic** as yours.
+                        - **Gray Nodes**: Papers in **different topics** (showing cross-disciplinary connections).
+                        - **Labels**: Direct neighbors show their **Paper ID** for quick reference.
+                        - **Edge Thickness**: Thicker lines indicate **higher similarity** to your paper.
                         """)
                     
                     col_viz1, col_viz2 = st.columns(2)
