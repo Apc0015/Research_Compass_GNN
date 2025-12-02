@@ -1,6 +1,6 @@
 # Research Compass - GNN Paper Classifier
 
-**Live Demo:** [https://researchcompassgnn-eu79pkqkj4ywp5aetcjlcx.streamlit.app/](https://researchcompassgnn-eu79pkqkj4ywp5aetcjlcx.streamlit.app/)
+**Live Demo:** [https://researchcompassgnn-bfnjwzhq8s2rawxndjwb6e.streamlit.app/](https://researchcompassgnn-bfnjwzhq8s2rawxndjwb6e.streamlit.app/)
 
 A Graph Neural Network (GNN) based system for classifying research papers into topics using citation networks (OGB arXiv) and co-authorship networks (AMiner).
 
