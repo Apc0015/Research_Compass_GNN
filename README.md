@@ -1,6 +1,6 @@
 # Research Compass - GNN Paper Classifier
 
-**Live Demo:** [https://researchcompassgnn-bcvqiw3gxtrdgqdkxhv4ht.streamlit.app/](https://researchcompassgnn-bfnjwzhq8s2rawxndjwb6e.streamlit.app/)
+**Live Demo:** [https://researchcompassgnn-bcvqiw3gxtrdgqdkxhv4ht.streamlit.app/](https://researchcompassgnn-bcvqiw3gxtrdgqdkxhv4ht.streamlit.app/)
 
 A Graph Neural Network (GNN) based system for classifying research papers into topics using citation networks (OGB arXiv) and co-authorship networks (AMiner).
 
@@ -46,7 +46,7 @@ pip install -r requirements.txt
 streamlit run app.py
 ```
 
-Open http://localhost:8501 in your browser.
+Open https://researchcompassgnn-bcvqiw3gxtrdgqdkxhv4ht.streamlit.app/ in your browser.
 
 ## Training Your Own Models
 
