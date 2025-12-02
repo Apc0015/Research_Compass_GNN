@@ -900,19 +900,7 @@ def main():
             index=default_idx,
             help="Choose the Graph Neural Network architecture"
         )
-        
-        st.markdown("---")
-        st.markdown("### Training Notebooks")
-        st.markdown("""
-        View complete training code:
-        - [OGB Training](https://github.com/Apc0015/Research_Compass_GNN/blob/main/notebooks/GNN_OGB.ipynb)
-        - [AMiner Training](https://github.com/Apc0015/Research_Compass_GNN/blob/main/notebooks/GNN_AMiner.ipynb)
 
-        [**View Project Repository**](https://github.com/Apc0015/Research_Compass_GNN)
-
-        Retrain models by running all cells in these notebooks.
-        """)
-    
     # Load models
     with st.spinner(f"Loading {dataset_choice} models..."):
         gat, gcn, sage, results, dataset_config = load_models(dataset_choice)
