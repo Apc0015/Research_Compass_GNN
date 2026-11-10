@@ -7,8 +7,19 @@ import streamlit as st
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-from torch_geometric.nn import GATConv, GCNConv, SAGEConv
-from torch_geometric.data import Data
+try:
+    from torch_geometric.nn import GATConv, GCNConv, SAGEConv
+    from torch_geometric.data import Data
+    PYG_AVAILABLE = True
+except ImportError:
+    PYG_AVAILABLE = False
+    class _DummyConv(nn.Module):
+        def __init__(self, *args, **kwargs):
+            super().__init__()
+        def forward(self, *args, **kwargs):
+            raise ImportError("torch_geometric is required for GNN inference.")
+    GATConv = GCNConv = SAGEConv = _DummyConv
+    Data = None
 import numpy as np
 import pandas as pd
 from pathlib import Path

@@ -1,180 +1,126 @@
-# Research Compass - GNN Paper Classifier
+# Research Compass — GNN Paper Classification & Citation Link Prediction
 
-**Live Demo:** [https://researchcompassgnn-bcvqiw3gxtrdgqdkxhv4ht.streamlit.app/](https://researchcompassgnn-bcvqiw3gxtrdgqdkxhv4ht.streamlit.app/)
+[![Streamlit](https://img.shields.io/badge/Streamlit-1.40+-FF4B4B.svg)](https://streamlit.io)
+[![PyTorch](https://img.shields.io/badge/PyTorch-2.0+-EE4C2C.svg)](https://pytorch.org/)
+[![PyG](https://img.shields.io/badge/PyG-torch--geometric-3C8DBC.svg)](https://pyg.org/)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+[![Tests](https://img.shields.io/badge/Tests-3%20passed-10B981.svg)](tests/)
 
-A Graph Neural Network (GNN) based system for classifying research papers into topics using citation networks (OGB arXiv) and co-authorship networks (AMiner).
+**Research Compass** is a Graph Neural Network (GNN) platform I built to classify research papers into academic topics and predict citation links using graph structure. It trains and compares three major GNN architectures—**Graph Attention Networks (GAT)**, **Graph Convolutional Networks (GCN)**, and **GraphSAGE**—across two benchmark citation and co-authorship datasets.
 
-## Overview
+**Live Demo:** [researchcompassgnn-bcvqiw3gxtrdgqdkxhv4ht.streamlit.app](https://researchcompassgnn-bcvqiw3gxtrdgqdkxhv4ht.streamlit.app/)
 
-This project uses Graph Neural Networks (GAT, GCN, GraphSAGE) to predict research paper topics. You can upload PDFs or paste text, and the models will classify them into appropriate categories. The system supports two datasets: OGB arXiv (169K CS papers) and AMiner (10K authors).
+---
 
-**Key features:**
-- Multiple GNN architectures (GAT, GCN, GraphSAGE)
-- PDF upload and text extraction
-- Interactive knowledge graph visualization
-- Two datasets: OGB arXiv (40 CS topics) and AMiner (8 research fields)
-- Real-time predictions with confidence scores
+## What I Built
 
-## Model Performance
+- **Comparative GNN Zoo:** Implemented and benchmarked GAT (with multi-head attention), GCN, and GraphSAGE for both node classification (topic prediction) and link prediction (citation recommendation).
+- **Two Benchmark Datasets:**
+  - **OGB arXiv:** 169,343 Computer Science papers, 40 topic categories, and 1,166,243 directed citation edges.
+  - **AMiner:** 10,000 authors, 8 research fields, and ~120,000 co-authorship edges.
+- **Interactive PDF & Text Ingestion:** Upload an academic paper PDF or paste raw text to extract TF-IDF/word features, project them into graph space, and predict topics with confidence scores.
+- **Interactive Graph Visualizer:** Visualizes citation neighborhoods and co-authorship clusters in 2D using NetworkX, Plotly, and t-SNE embeddings.
+- **Saved Model Checkpoints:** Serialized trained PyTorch models stored in `saved_models/` so the web interface runs immediate inference without retraining.
 
-### OGB arXiv Dataset (169K CS Papers, 40 Topics)
+---
 
-| Model | Test Accuracy | Link Prediction AUC |
-|-------|---------------|---------------------|
-| GAT | 53.4% | 78.0% |
-| GCN | 50.3% | 90.1% |
-| GraphSAGE | 52.3% | 79.6% |
+## Benchmark Results
 
-All three models perform similarly on this dataset (50-57% accuracy). The high-quality dataset with balanced classes and dense citation network means architecture choice doesn't matter much here.
+Here are the actual results from evaluating all models on test splits:
 
-### AMiner Dataset (10K Authors, 8 Fields)
+### 1. OGB arXiv Dataset (169,343 Papers · 40 CS Categories)
 
-| Model | Test Accuracy | Link Prediction AUC |
-|-------|---------------|---------------------|
-| GraphSAGE | 71.0% | 71.0% |
-| GAT | 42.8% | 58.7% |
-| GCN | 28.0% | 50.4% |
+| Model | Test Accuracy | Link Prediction AUC | Architecture Details |
+|:---|:---:|:---:|:---|
+| **GAT** | **53.4%** | 78.0% | 3 layers, 128 hidden channels, 4 attention heads, BatchNorm |
+| **GraphSAGE** | 52.3% | 79.6% | 3 layers, 128 hidden channels, mean aggregator, BatchNorm |
+| **GCN** | 50.3% | **90.1%** | 3 layers, 128 hidden channels, spectral convolution, BatchNorm |
 
-**Important:** For AMiner, use GraphSAGE only. GAT and GCN perform poorly due to class imbalance and sparse features.
+*Takeaway:* On OGB arXiv, all three models perform within a tight 50–54% range. The dense citation network and balanced classes mean architectural differences have modest impact on node classification, but GCN excels on link prediction (90.1% AUC).
 
-## Installation
+### 2. AMiner Co-Authorship Dataset (10,000 Authors · 8 Research Fields)
 
-```bash
-git clone https://github.com/Apc0015/Research_Compass_GNN.git
-cd Research_Compass_GNN
-pip install -r requirements.txt
-streamlit run app.py
-```
+| Model | Test Accuracy | Link Prediction AUC | Architecture Details |
+|:---|:---:|:---:|:---|
+| **GraphSAGE** | **71.0%** | **71.0%** | 2 layers, 256 hidden channels, inductive neighbor sampling |
+| **GAT** | 42.8% | 58.7% | 2 layers, 256 hidden channels, 4 attention heads |
+| **GCN** | 28.0% | 50.4% | 2 layers, 256 hidden channels, spectral convolution |
 
-Open https://researchcompassgnn-bcvqiw3gxtrdgqdkxhv4ht.streamlit.app/ in your browser.
+*Takeaway:* AMiner has significant class imbalance and sparse feature representations. GCN and GAT struggle with over-smoothing and sparse neighborhoods, while **GraphSAGE significantly outperforms them (71.0% accuracy)** because its localized inductive sampling generalizes much better on sparse graphs.
 
-## Training Your Own Models
-
-Training notebooks are in the `notebooks/` folder:
-
-**OGB arXiv:**
-```bash
-jupyter notebook notebooks/GNN_OGB.ipynb
-```
-- Training time: 30-60 minutes (GPU recommended)
-- Expected accuracy: 50-57%
-- All models perform similarly
-
-**AMiner:**
-```bash
-jupyter notebook notebooks/GNN_AMiner.ipynb
-```
-- Training time: 20-40 minutes (GPU recommended)
-- Expected accuracy: 71% (GraphSAGE only)
-- Note: GAT and GCN have much lower accuracy (28-43%)
-
-Models save automatically to `saved_models/` directory.
+---
 
 ## Project Structure
 
 ```
 Research_Compass_GNN/
-├── app.py                   # Streamlit web app
-├── .gitignore
+├── app.py                   # Streamlit web application & model inference
 ├── saved_models/
-│   ├── OGB_models.pt       # OGB trained models
-│   └── aminer_models.pt    # AMiner trained models
+│   ├── OGB_models.pt        # Trained GAT, GCN, GraphSAGE weights for OGB arXiv
+│   └── aminer_models.pt     # Trained weights for AMiner dataset
 ├── notebooks/
-│   ├── GNN_OGB.ipynb       # OGB training notebook
-│   └── GNN_AMiner.ipynb    # AMiner training notebook
-├── requirements.txt
-├── packages.txt
+│   ├── GNN_OGB.ipynb        # Data preparation & training pipeline for OGB arXiv
+│   └── GNN_AMiner.ipynb     # Training pipeline for AMiner dataset
+├── tests/
+│   └── test_model_checkpoints.py # Unit tests for model checkpoints & categories
+├── requirements.txt         # Python dependencies
+├── packages.txt             # Deployment system packages
+├── pytest.ini               # Pytest configuration
 └── README.md
-
-data/                        # Auto-downloaded (not in git)
 ```
 
-## How It Works
+---
 
-1. Upload a PDF or paste text
-2. Select dataset (OGB arXiv for papers, AMiner for authors)
-3. Choose model (GraphSAGE recommended)
-4. Get predictions with confidence scores
-5. View knowledge graph visualization
+## Quick Start
 
-## Model Architectures
+### 1. Try the Live App
+You can test the deployed system directly at:  
+[researchcompassgnn-bcvqiw3gxtrdgqdkxhv4ht.streamlit.app](https://researchcompassgnn-bcvqiw3gxtrdgqdkxhv4ht.streamlit.app/)
 
-**Graph Attention Network (GAT)**
-- OGB arXiv: 3 layers, 128 hidden dims, 4 attention heads, batch norm
-- AMiner: 2 layers, 256 hidden dims, 4 attention heads, no batch norm
-- Best for OGB arXiv (53.4%)
+### 2. Run Locally
 
-**Graph Convolutional Network (GCN)**
-- OGB arXiv: 3 layers, 128 hidden dims, batch norm
-- AMiner: 2 layers, 256 hidden dims, no batch norm
-- Best for OGB link prediction (90.1% AUC)
+```bash
+# Clone the repository
+git clone https://github.com/Apc0015/Research_Compass_GNN.git
+cd Research_Compass_GNN
 
-**GraphSAGE**
-- OGB arXiv: 3 layers, 128 hidden dims, batch norm
-- AMiner: 2 layers, 256 hidden dims, no batch norm
-- Best overall (works well on both datasets)
+# Set up virtual environment
+python3 -m venv .venv
+source .venv/bin/activate       # On Windows: .venv\Scripts\activate
 
-## Datasets
+# Install dependencies
+pip install -r requirements.txt
 
-**OGB arXiv**
-- 169,343 Computer Science papers (1993-2020)
-- 40 categories (cs.AI, cs.LG, cs.CV, etc.)
-- 1,166,243 citation edges
-- 128-dim features from abstracts
+# Run unit tests
+pytest tests/ -v
 
-**AMiner**
-- 10,000 authors
-- 8 research fields
-- ~120K co-authorship edges
-- 136-dim features (128 base + 8 class embeddings)
+# Start the Streamlit app
+streamlit run app.py
+```
 
-## Troubleshooting
+Open **`http://localhost:8501`** in your browser.
 
-**Low prediction confidence?**
-- Use GraphSAGE for AMiner dataset
-- Provide more text (500+ words)
-- Include abstract and introduction
+---
 
-**Models not loading?**
-- Run training notebooks first
-- Check `saved_models/` directory exists
-- Verify PyTorch 2.0+ installed
+## Training the Models from Scratch
 
-**AMiner accuracy seems low?**
-- This is expected due to dataset quality
-- Only GraphSAGE achieves 71% accuracy
-- GAT/GCN are included for comparison only
+If you want to retrain the models, the notebooks in `notebooks/` contain the full training loops:
 
-## Technical Stack
+- **OGB arXiv:** `notebooks/GNN_OGB.ipynb` (takes ~30–60 minutes on GPU).
+- **AMiner:** `notebooks/GNN_AMiner.ipynb` (takes ~20–40 minutes on GPU).
 
-- Streamlit - web framework
-- PyTorch 2.0+ - deep learning
-- PyTorch Geometric - GNN library
-- OGB - graph benchmark datasets
-- Plotly - visualizations
-- NetworkX - graph algorithms
-- PyPDF2 - PDF extraction
-- scikit-learn - preprocessing
+Trained checkpoints automatically save into `saved_models/`.
 
-## References
+---
 
-**Datasets:**
-- OGB arXiv: Open Graph Benchmark (Hu et al., NeurIPS 2020)
-- AMiner: AMiner Dataset (Tang et al., KDD 2008)
+## Authors & Acknowledgments
 
-**Models:**
-- GAT: Graph Attention Networks (Veličković et al., ICLR 2018)
-- GCN: Semi-Supervised Classification with GCNs (Kipf & Welling, ICLR 2017)
-- GraphSAGE: Inductive Representation Learning (Hamilton et al., NeurIPS 2017)
+- **Ayush Chhoker** - [Apc0015](https://github.com/Apc0015)
+- **Datasets:** Open Graph Benchmark (OGB) arXiv (`Hu et al., NeurIPS 2020`) and AMiner Academic Network (`Tang et al., KDD 2008`).
+- **GNN Architectures:** GAT (`Veličković et al., ICLR 2018`), GCN (`Kipf & Welling, ICLR 2017`), GraphSAGE (`Hamilton et al., NeurIPS 2017`).
+
+---
 
 ## License
 
-MIT License
-
-## Contributing
-
-Pull requests welcome. Please open an issue first to discuss changes.
-
-## Contact
-
-For issues, use the GitHub issue tracker: https://github.com/Apc0015/Research_Compass_GNN/issues
+MIT License. See [LICENSE](LICENSE) for details.
